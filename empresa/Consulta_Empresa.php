@@ -1,16 +1,44 @@
 <?php
 session_start();
+class Verificar{
 
-// Verifica se as variáveis de sessão estão definidas (indicando que o usuário está logado)
+    private $cod;
+    private $email;
+
+    public function __construct($cd,$email){
+        $this->email = $email;
+        $this->cd = $cd;
+    } 
+public static function validar($cd,$email){
 if (!isset($_SESSION['cd']) || !isset($_SESSION['email'])) {
-    // Se não estiver logado, redireciona para a página de login
+    
     header('Location: siteirmandade.php');
-    exit; // Interrompe a execução do código após o redirecionamento
+    exit; }}
+
+ public static function carregarDadosSessao() {
+        if (isset($_SESSION['cd']) && isset($_SESSION['email'])) {
+            return new self($_SESSION['cd'], $_SESSION['email']);
+        }
+        return null;
+    }
+
+
+public static function conectarBanco() {
+    include_once('conexaoIrm.php');
+    return $conn; // Supondo que 'conexaoIrm.php' define a variável $conn
+}}
+Verificar::validar(); // Valida a sessão
+// Carrega os dados da sessão
+$verificador = Verificar::carregarDadosSessao();
+if ($verificador) {
+    echo "Código: " . $verificador->cod . "<br>";
+    echo "Email: " . $verificador->email . "<br>";
 }
-$cod = $_SESSION['cd'];
-
-include_once('conexaoIrm.php');
-
+// Conecta ao banco de dados
+$conn = Verificar::conectarBanco();
+if ($conn) {
+    echo "Conexão com o banco de dados estabelecida.";
+}
 ?> 
 <!DOCTYPE html>
 <html lang="pt-br">

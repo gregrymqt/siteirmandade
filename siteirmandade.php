@@ -1,67 +1,128 @@
 <?php
 session_start();
 
-if (!empty($_POST['email']) && !empty($_POST['senha'])) {
+// Classe para gerenciar a conexão com o banco de dados
+class Conexao {
+    private $conn;
 
-  $email = filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL);
-  $senha = $_POST['senha']; // Senha fornecida pelo usuário
-  $destination = isset($_POST['destination']) ? $_POST['destination'] : '';
-
-  include_once('conexaoIrm.php');
-
-  // Protege contra injeção SQL
-  $stmt = $conn->prepare("SELECT email_u, senha_u, cd_u from usuario where email_u = :email");
-  $stmt->execute(['email' => $email]);
-
-  $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-  if ($row) {
-    if (password_verify($senha, $row['senha_u'])) {
-      // Verifica se o destino é válido
-
-      // Armazenar dados na sessão
-      $_SESSION['cd'] = $row['cd_u'];
-      $_SESSION['email'] = $row['email_u'];
-
-      if (isValidDestination($destination)) {
-        // Redireciona com base no destino
-        $redirectPage = getRedirectPage($destination);
-        header("Location: $redirectPage");
-        exit;
-      } else {
-        echo "Destino inválido.";
-        exit;
-      }
-    } else {
-      // senha não encontrado
-      echo "<script>alert('Email ou senha incorretos.'); window.history.back();</script>";
-      exit;
+    public function __construct($dsn, $usuario, $senha) {
+        try {
+            $this->conn = new PDO($dsn, $usuario, $senha);
+            $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        } catch (PDOException $e) {
+            die("Erro na conexão: " . $e->getMessage());
+        }
     }
-  } else {
-    // Usuário não encontrado
-    echo "<script>alert('Email ou senha incorretos.'); window.history.back();</script>";
-    exit;
-  }
+
+    public function getConnection() {
+        return $this->conn;
+    }
 }
 
-// Função para verificar se o destino é válido.
-function isValidDestination($destination)
-{
-  $allowedDestinations = ['destino1', 'destino2'];
-  return in_array($destination, $allowedDestinations);
+// Classe para representar um usuário
+class Usuario {
+    private $email;
+    private $senha;
+    private $codigo;
+
+    public function __construct($email, $senha, $codigo) {
+        $this->email = $email;
+        $this->senha = $senha;
+        $this->codigo = $codigo;
+    }
+
+    public function getEmail() {
+        return $this->email;
+    }
+
+    public function getCodigo() {
+        return $this->codigo;
+    }
+
+    public function verificarSenha($senhaFornecida) {
+        return password_verify($senhaFornecida, $this->senha);
+    }
+
+    public static function buscarPorEmail($conn, $email) {
+        $stmt = $conn->prepare("SELECT email_u, senha_u, cd_u FROM usuario WHERE email_u = :email");
+        $stmt->execute(['email' => $email]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($row) {
+            return new Usuario($row['email_u'], $row['senha_u'], $row['cd_u']);
+        }
+
+        return null;
+    }
 }
 
-//Função para obter a página de redirecionamento com base no destino.
-function getRedirectPage($destination)
-{
-  switch ($destination) {
-    case 'destino1':
-      return 'consulta_usuario.php';
-    case 'destino2':
-      return 'produtos.php';
-    default:
-      return 'pagina_default.php'; // Página padrão caso o destino seja inválido
-  }
+// Classe para gerenciar a autenticação
+class Autenticador {
+    private $conexao;
+
+    public function __construct(Conexao $conexao) {
+        $this->conexao = $conexao->getConnection();
+    }
+
+    public function autenticar($email, $senha, $destination) {
+        // Buscar usuário pelo email
+        $usuario = Usuario::buscarPorEmail($this->conexao, $email);
+
+        if ($usuario && $usuario->verificarSenha($senha)) {
+            // Armazenar dados na sessão
+            $_SESSION['cd'] = $usuario->getCodigo();
+            $_SESSION['email'] = $usuario->getEmail();
+
+            // Validar e redirecionar com base no destino
+            if ($this->isValidDestination($destination)) {
+                $redirectPage = $this->getRedirectPage($destination);
+                header("Location: $redirectPage");
+                exit;
+            } else {
+                echo "Destino inválido.";
+                exit;
+            }
+        } else {
+            echo "<script>alert('Email ou senha incorretos.'); window.history.back();</script>";
+            exit;
+        }
+    }
+
+    private function isValidDestination($destination) {
+        // Lista de destinos permitidos
+        $allowedDestinations = ['destino1', 'destino2'];
+        return in_array($destination, $allowedDestinations);
+    }
+
+    private function getRedirectPage($destination) {
+        // Mapear destinos para URLs
+        switch ($destination) {
+            case 'destino1':
+                return 'consulta_usuario.php';
+            case 'destino2':
+                return 'produtos.php';
+            default:
+                return 'pagina_default.php'; // Página padrão caso o destino seja inválido
+        }
+    }
+}
+
+// Execução do script
+if (!empty($_POST['email']) && !empty($_POST['senha'])) {
+    $email = filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL);
+    $senha = $_POST['senha'];
+    $destination = isset($_POST['destination']) ? $_POST['destination'] : '';
+
+    // Configuração da conexão com o banco de dados
+    $dsn = 'mysql:host=localhost;dbname=irmandade;charset=utf8';
+    $usuarioDB = 'root';
+    $senhaDB = '';
+
+    $conexao = new Conexao($dsn, $usuarioDB, $senhaDB);
+    $autenticador = new Autenticador($conexao);
+
+    // Realizar autenticação
+    $autenticador->autenticar($email, $senha, $destination);
 }
 ?>
 
@@ -381,11 +442,11 @@ $(document).ready(function () {
         switch (redi) {
           case '1':
             alert("Você será redirecionado !");
-            window.location.href = 'CadastroUsuario.php'; // Redireciona
+            window.location.href = 'usuario/CadastroUsuario.php'; // Redireciona
             break;
           case '2':
             alert("Você será redirecionado !");
-            window.location.href = 'CadastroEmpresa.php'; // Redireciona
+            window.location.href = 'empresa/CadastroEmpresa.php'; // Redireciona
             break;
           default:
             alert("Nenhuma opção selecionada!");
