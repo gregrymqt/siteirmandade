@@ -1,3 +1,50 @@
+<?php
+// Inicia a sessão no início do script
+session_start();
+
+if (!empty($_POST)) {
+    // Filtra os inputs
+    $nome = filter_input(INPUT_POST, 'nm_u', FILTER_SANITIZE_STRING);
+    $senha = $_POST['senha_u'];
+    $email = filter_input(INPUT_POST, 'email_u', FILTER_SANITIZE_EMAIL);
+
+    // Verifica campos obrigatórios
+    if (empty($nome) || empty($email) || empty($senha)) {
+        $_SESSION['msg'] = 'Todos os campos são obrigatórios!';
+        header('Location: cadastro.php'); // Volta para o formulário
+        exit;
+    }
+
+    // Criptografa a senha
+    $senhaHash = password_hash($senha, PASSWORD_DEFAULT);
+
+    include_once('C:/xampp/htdocs/dashboard/siteirmandade/conexaoIrm.php');
+
+    try {
+        $stmt = $conn->prepare("INSERT INTO usuario (nm_u, senha_u, email_u) VALUES (:nome, :senha, :email)");
+        $stmt->bindParam(':nome', $nome);
+        $stmt->bindParam(':email', $email);
+        $stmt->bindParam(':senha', $senhaHash);
+
+        if ($stmt->execute()) {
+           
+            header('Location: siteIrmandade.php');
+            exit;
+        } else {
+            $_SESSION['msg'] = 'Erro ao cadastrar usuário';
+            header('Location: cadastro.php');
+            exit;
+        }
+
+    } catch (PDOException $e) {
+        $_SESSION['msg'] = 'Erro no banco de dados: ' . $e->getMessage();
+        header('Location: cadastro.php');
+        exit;
+    }
+
+    $conn = null;
+}
+?>
 <!DOCTYPE html>
 <html lang="pt-br">
 
@@ -114,15 +161,15 @@
                     <div class="mb-3">
                         <h3 class=" text-center">Cadastro de Cliente</h3>
                         <label class="form-label">Nome</label>
-                        <input type="text" class="form-control" name="nm_u">
+                        <input type="text" class="form-control" name="nm_u" onblur="validarNome(this)">
 
-                        <<label class="form-label">Email</label>
-                            <input type="text" class="form-control" id="email" name="email_u"
-                                onblur="validarEmail(this);" required>
-                            <span id="erroEmail" style="color: red;"></span>
+                        <label class="form-label">Email</label>
+                        <input type="text" class="form-control" id="email" name="email_u" onblur="validarEmail(this);"
+                            required>
+                        <span id="erroEmail" style="color: red;"></span>
 
-                            <label class="form-label">Senha</label>
-                            <input type="password" class="form-control" name="senha_u">
+                        <label class="form-label">Senha</label>
+                        <input type="password" class="form-control" name="senha_u">
 
 
                     </div>
@@ -180,7 +227,7 @@
                 event.preventDefault(); // Impede o envio do formulário se o e-mail for inválido
             }
         });
-        
+
 
         function validarNome(input) {
             const nome = input.value.trim(); // Pega o valor do input e remove espaços em branco no início e no fim
@@ -218,47 +265,3 @@
 </body>
 
 </html>
-
-<?php
-if (!empty($_POST)) {
-
-    $nome = filter_input(type: INPUT_POST, var_name: 'nm_u', filter: FILTER_SANITIZE_STRING);
-    $senha = $_POST['senha_u']; // Senha em texto plano
-    $email = filter_input(type: INPUT_POST, var_name: 'email_u', filter: FILTER_SANITIZE_EMAIL);
-
-    $senhaHash = password_hash($senha, PASSWORD_DEFAULT);
-
-    // Verifica se todos os campos foram preenchidos
-    if (empty($nome) || empty($email) || empty($senha)) {
-        echo "<script>alert('Todos os campos são obrigatórios!');</script>";
-        exit;
-    }
-
-
-    include_once('conexaoIrm.php'); // Verifique se o arquivo de conexão está correto
-
-    try {
-        // Prepara a query de inserção
-        $stmt = $conn->prepare("INSERT INTO usuario (nm_u, senha_u, email_u) VALUES (:nome, :senha, :email)");
-
-        // Faz o bind dos parâmetros
-        $stmt->bindParam(':nome', $nome);
-        $stmt->bindParam(':email', $email);
-        $stmt->bindParam(':senha', $senhaHash); // Usa a senha criptografada
-
-        // Executa a query
-        if ($stmt->execute()) {
-            echo "<script>alert('Cadastrado com sucesso!'); window.location.href='produtos.php';</script>";  // Redireciona para a página de produtos após sucesso
-        } else {
-            echo "<script>alert('Erro ao cadastrar usuário');</script>";
-        }
-
-    } catch (PDOException $e) {
-        // Caso ocorra erro na execução da query
-        echo "<script>alert('Erro no banco de dados: " . $e->getMessage() . "');</script>";
-    }
-
-    // Fecha a conexão
-    $conn = null;
-}
-?>

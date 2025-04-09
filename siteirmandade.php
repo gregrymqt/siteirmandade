@@ -1,131 +1,24 @@
 <?php
-session_start();
+include_once('C:/xampp/htdocs/dashboard/siteirmandade/conexao/conexaoIrm.php');
+include_once('classes/Usuario.php');
+include_once('classes/Produto.php');
+include_once('classes/Sessao.php');
 
-// Classe para gerenciar a conexão com o banco de dados
-class Conexao {
-    private $conn;
+// Verificação de login
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
+  $usuario = new Usuario();
+  $sessao = new Sessao();
 
-    public function __construct($dsn, $usuario, $senha) {
-        try {
-            $this->conn = new PDO($dsn, $usuario, $senha);
-            $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        } catch (PDOException $e) {
-            die("Erro na conexão: " . $e->getMessage());
-        }
-    }
+  $dadosUsuario = $usuario->login($_POST['email'], $_POST['senha']);
 
-    public function getConnection() {
-        return $this->conn;
-    }
-}
-
-// Classe para representar um usuário
-class Usuario {
-    private $email;
-    private $senha;
-    private $codigo;
-
-    public function __construct($email, $senha, $codigo) {
-        $this->email = $email;
-        $this->senha = $senha;
-        $this->codigo = $codigo;
-    }
-
-    public function getEmail() {
-        return $this->email;
-    }
-
-    public function getCodigo() {
-        return $this->codigo;
-    }
-
-    public function verificarSenha($senhaFornecida) {
-        return password_verify($senhaFornecida, $this->senha);
-    }
-
-    public static function buscarPorEmail($conn, $email) {
-        $stmt = $conn->prepare("SELECT email_u, senha_u, cd_u FROM usuario WHERE email_u = :email");
-        $stmt->execute(['email' => $email]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if ($row) {
-            return new Usuario($row['email_u'], $row['senha_u'], $row['cd_u']);
-        }
-
-        return null;
-    }
-}
-
-// Classe para gerenciar a autenticação
-class Autenticador {
-    private $conexao;
-
-    public function __construct(Conexao $conexao) {
-        $this->conexao = $conexao->getConnection();
-    }
-
-    public function autenticar($email, $senha, $destination) {
-        // Buscar usuário pelo email
-        $usuario = Usuario::buscarPorEmail($this->conexao, $email);
-
-        if ($usuario && $usuario->verificarSenha($senha)) {
-            // Armazenar dados na sessão
-            $_SESSION['cd'] = $usuario->getCodigo();
-            $_SESSION['email'] = $usuario->getEmail();
-
-            // Validar e redirecionar com base no destino
-            if ($this->isValidDestination($destination)) {
-                $redirectPage = $this->getRedirectPage($destination);
-                header("Location: $redirectPage");
-                exit;
-            } else {
-                echo "Destino inválido.";
-                exit;
-            }
-        } else {
-            echo "<script>alert('Email ou senha incorretos.'); window.history.back();</script>";
-            exit;
-        }
-    }
-
-    private function isValidDestination($destination) {
-        // Lista de destinos permitidos
-        $allowedDestinations = ['destino1', 'destino2'];
-        return in_array($destination, $allowedDestinations);
-    }
-
-    private function getRedirectPage($destination) {
-        // Mapear destinos para URLs
-        switch ($destination) {
-            case 'destino1':
-                return 'consulta_usuario.php';
-            case 'destino2':
-                return 'produtos.php';
-            default:
-                return 'pagina_default.php'; // Página padrão caso o destino seja inválido
-        }
-    }
-}
-
-// Execução do script
-if (!empty($_POST['email']) && !empty($_POST['senha'])) {
-    $email = filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL);
-    $senha = $_POST['senha'];
-    $destination = isset($_POST['destination']) ? $_POST['destination'] : '';
-
-    // Configuração da conexão com o banco de dados
-    $dsn = 'mysql:host=localhost;dbname=irmandade;charset=utf8';
-    $usuarioDB = 'root';
-    $senhaDB = '';
-
-    $conexao = new Conexao($dsn, $usuarioDB, $senhaDB);
-    $autenticador = new Autenticador($conexao);
-
-    // Realizar autenticação
-    $autenticador->autenticar($email, $senha, $destination);
+  if ($dadosUsuario) {
+    $sessao->criarSessaoUsuario($dadosUsuario['cd_u'], $dadosUsuario['email_u']);
+    header('produtos.php');
+  } else {
+    $erroLogin = "Email ou senha incorretos!";
+  }
 }
 ?>
-
 <!doctype html>
 <html lang="pt-br">
 
@@ -229,7 +122,7 @@ if (!empty($_POST['email']) && !empty($_POST['senha'])) {
           <div class="form-check">
             <input class="form-check-input" type="radio" name="flexRadioDefault" value="1">
             <label class="form-check-label" for="flexRadioDefault1">
-            USUARIO
+              USUARIO
             </label>
           </div>
           <div class="form-check">
@@ -270,12 +163,12 @@ if (!empty($_POST['email']) && !empty($_POST['senha'])) {
         </div>
       </div>
       <div class="carousel-item" data-bs-interval="2100">
-        <img src="imagens/adidas.jpg" class="d-block w-100" alt="...">
+        <img src="img/adidas.jpg" class="d-block w-100" alt="...">
         <div class="carousel-caption d-none d-md-block">
         </div>
       </div>
       <div class="carousel-item" data-bs-interval="2100">
-        <img src="imagens/puma.jpg" class="d-block w-100" alt="...">
+        <img src="img/puma.jpg" class="d-block w-100" alt="...">
         <div class="carousel-caption d-none d-md-block">
         </div>
       </div>
@@ -319,37 +212,32 @@ if (!empty($_POST['email']) && !empty($_POST['senha'])) {
 
   <hr> <br>
 
+  <section class="container my-5">
+    <h2 class="text-center mb-4">Nossos Produtos</h2>
+    <div class="row" id="produtos-container">
+      <?php
+      $produto = new Produto();
+      $produtos = $produto->listarProdutos();
 
-  <p style="text-align: center; " id="produton" class="fs-2">Nike</p>
-
-
-
-  <!-- cards dos produtos -->
-  <div class="container text-center">
-    <div class="row">
-      <div class="col">
-        <div class="card" style="width: 18rem;">
-          <img src="https://imgnike-a.akamaihd.net/360x360/0262063XA8.jpg" class="card-img-top" alt="Nike Cortez 23">
-          <div class="card-body">
-            <h5 class="card-title">Nike Cortez 23</h5>
-            <p class="card-text">R$ 712,49</p>
-            <!-- Botão que abre o modal -->
-            <button type="button" data-bs-toggle="modal" data-bs-target="#exampleModal" data-destination="destino2"
-              onclick="setDestination(this)" class="btn btn-primary">
-              Compre já!
-            </button>
-          </div>
-        </div>
-      </div>
+      foreach ($produtos as $prod) {
+        echo '<div class="col-md-4 mb-4">
+                    <div class="card">
+                        <img src="assets/img/produtos/' . $prod['imagem'] . '" class="card-img-top" alt="' . $prod['nome'] . '">
+                        <div class="card-body">
+                            <h5 class="card-title">' . $prod['nome'] . '</h5>
+                            <p class="card-text">' . $prod['descricao'] . '</p>
+                            <p class="text-muted">R$ ' . number_format($prod['preco'], 2, ',', '.') . '</p>
+                        </div>
+                    </div>
+                </div>';
+      }
+      ?>
     </div>
-  </div>
+    <div class="text-center">
+      <button id="carregar-mais" class="btn btn-primary">Carregar Mais</button>
+    </div>
+  </section>
 
-
-
-  <!-- fim dos cards -->
-  <hr>
-
-  <!-- Sobre nós -->
 
   <p style="text-align: center;" class="fs-2">Sobre Nós</p>
   <div class="container text-center">
@@ -383,56 +271,79 @@ if (!empty($_POST['email']) && !empty($_POST['senha'])) {
 
   <br><br>
 
-  <footer style="background-color: rgb(121, 124, 124);">
-    <br>
-    <div class="container-fluid" style="background-color: rgb(0, 0, 0);">
-      <div class="row align-items-center" style="background-color: rgb(0, 0, 0);">
-        <!-- Coluna Siga-nos -->
-        <div class="col-4 text-start text-white">
-          <h5 class="text-white" id="contato">Siga-nos:</h5>
-          <p class="text-white">
-            <img
-              src="https://d1muf25xaso8hp.cloudfront.net/https://img.criativodahora.com.br/2024/01/criativo-65946738a901dMDIvMDEvMjAyNCAxNmg0Mg==.jpg?w=1000&h=&auto=compress&dpr=1&fit=max"
-              width="24" height="24"> Instagram: @Irmandadesports<br>
-            <img src="https://i.pinimg.com/736x/70/f9/36/70f936294a1f0f3949a9205df9340d5e.jpg" width="24" height="24">
-            Facebook: @Irmandadesports<br>
-            <img
-              src="https://e7.pngegg.com/pngimages/551/579/png-clipart-whats-app-logo-whatsapp-logo-whatsapp-cdr-leaf-thumbnail.png"
-              width="24" height="24"> Whatsapp: +55 (11)4002-8922<br>
-            <img src="https://cdn-icons-png.flaticon.com/512/281/281769.png" width="25" height="20"> Email:
-            Irmandadesports@gmail.com
-          </p>
-        </div>
+<footer style="background-color: rgb(121, 124, 124);">
+  <br>
+  <div class="container-fluid" style="background-color: rgb(0, 0, 0);">
+    <div class="row align-items-center" style="background-color: rgb(0, 0, 0);">
+      <!-- Coluna Siga-nos -->
+      <div class="col-4 text-start text-white">
+        <h5 class="text-white" id="contato">Siga-nos:</h5>
+        <p class="text-white">
+          <img
+            src="https://d1muf25xaso8hp.cloudfront.net/https://img.criativodahora.com.br/2024/01/criativo-65946738a901dMDIvMDEvMjAyNCAxNmg0Mg==.jpg?w=1000&h=&auto=compress&dpr=1&fit=max"
+            width="24" height="24"> Instagram: @Irmandadesports<br>
+          <img src="https://i.pinimg.com/736x/70/f9/36/70f936294a1f0f3949a9205df9340d5e.jpg" width="24" height="24">
+          Facebook: @Irmandadesports<br>
+          <img
+            src="https://e7.pngegg.com/pngimages/551/579/png-clipart-whats-app-logo-whatsapp-logo-whatsapp-cdr-leaf-thumbnail.png"
+            width="24" height="24"> Whatsapp: +55 (11)4002-8922<br>
+          <img src="https://cdn-icons-png.flaticon.com/512/281/281769.png" width="25" height="20"> Email:
+          Irmandadesports@gmail.com
+        </p>
+      </div>
 
-        <!-- Coluna Atendimento ao Cliente -->
-        <div class="col-4 text-center">
-          <h5 class="text-white">Atendimento ao Cliente</h5>
-          <p>
-            <a class="dropdown-item text-white" href="https://www.reclameaqui.com.br/" target="_blank">Reclame Aqui!</a>
-          </p>
-        </div>
+      <!-- Coluna Atendimento ao Cliente -->
+      <div class="col-4 text-center">
+        <h5 class="text-white">Atendimento ao Cliente</h5>
+        <p>
+          <a class="dropdown-item text-white" href="https://www.reclameaqui.com.br/" target="_blank">Reclame Aqui!</a>
+        </p>
+      </div>
 
-        <!-- Direitos Autorais -->
-        <div class="col-4 text-end">
-          <p class="text-white">
-            &copy; 2024 Ygor Matsumoto & Lucas Vicente. Todos os direitos reservados.
-          </p>
+      <!-- Direitos Autorais -->
+      <div class="col-4 text-end">
+        <p class="text-white">
+          &copy; 2024 Ygor Matsumoto & Lucas Vicente. Todos os direitos reservados.
+        </p>
+      </div>
+    </div>
+  </div>
+</footer>
+
+  <!-- Modal de Login -->
+  <div class="modal fade" id="loginModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Login</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <?php if (isset($erroLogin)): ?>
+            <div class="alert alert-danger"><?php echo $erroLogin; ?></div>
+          <?php endif; ?>
+          <form method="POST">
+            <div class="mb-3">
+              <label for="email" class="form-label">Email</label>
+              <input type="email" class="form-control" id="email" name="email" required>
+            </div>
+            <div class="mb-3">
+              <label for="senha" class="form-label">Senha</label>
+              <input type="password" class="form-control" id="senha" name="senha" required>
+            </div>
+            <button type="submit" name="login" class="btn btn-primary">Entrar</button>
+          </form>
         </div>
       </div>
     </div>
-  </footer>
+  </div>
 
-
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"
-    integrity="sha384-kenU1KFdBIe4zVF0s0G1M5b4hcpxyD9F7jL+jjXkk+Q2h455rYXK/7HAuoJl+0I4"
-    crossorigin="anonymous"></script>
-
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="js/script.js"></script>
   <script>
 
-$(document).ready(function () {
+
+    $(document).ready(function () {
       // Evento de clique no botão "Confirmar"
       $("#confirmar").click(function () {
         // Obtém o valor do radio button selecionado
@@ -459,12 +370,7 @@ $(document).ready(function () {
       const destination = button.getAttribute('data-destination');
       document.getElementById('modal-destination').value = destination;
     }
-
-
   </script>
-
-
 </body>
-
 
 </html>
