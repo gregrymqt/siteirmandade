@@ -1,5 +1,8 @@
 <?php
 session_start();
+require_once 'produto.php';
+include_once('C:/xampp/htdocs/dashboard/siteirmandade/conexao/conexaoIrm.php');
+
 
 // Verifica se o usuário está logado
 if (!isset($_SESSION['cd']) || !isset($_SESSION['email'])) {
@@ -8,73 +11,21 @@ if (!isset($_SESSION['cd']) || !isset($_SESSION['email'])) {
 }
 $cod = $_SESSION['cd'];
 
-include_once('conexaoIrm.php');
+$produtoHandler = new Produto();
+
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['imgproduto'])) {
-    $targetDir = "img/produto/";
-
-    // Verifica se o diretório existe, se não, cria-o
-    if (!is_dir($targetDir)) {
-        mkdir($targetDir, 0777, true);
-    }
-
-    $imageFileType = strtolower(pathinfo($_FILES["imgproduto"]["name"], PATHINFO_EXTENSION));
-
-    // Gerar um novo nome para a imagem baseado na data e hora
-    date_default_timezone_set( 'America/Sao_Paulo');
-    $newFileName = date("Y.m.d-H.i.s") . '.' . $imageFileType;
-    $targetFile = $targetDir . $newFileName;
-
-    $uploadOk = 1;
-
-    // Verifica se o arquivo é uma imagem real ou falsa
-    $check = getimagesize($_FILES["imgproduto"]["tmp_name"]);
-    if ($check !== false) {
-        // echo "<script>alert('O arquivo é uma imagem - " . $check["mime"] . ".');</script>";
-        $uploadOk = 1;
+    $result = $produtoHandler->uploadImagem($cod);
+    
+    if ($result['success']) {
+        echo "<script>alert('Upload realizado com sucesso!');</script>";
     } else {
-        echo "<script>alert('O arquivo não é uma imagem.');</script>";
-        $uploadOk = 0;
-    }
-
-    // Verifica o tamanho do arquivo
-    if ($_FILES["imgproduto"]["size"] > 500000) {
-        echo "<script>alert('Desculpe, o arquivo é muito grande.');</script>";
-        $uploadOk = 0;
-    }
-
-    // Permite apenas certos formatos de arquivo
-    if ($imageFileType != "jpg" && $imageFileType != "png" && $imageFileType != "jpeg" && $imageFileType != "gif") {
-        echo "<script>alert('Desculpe, apenas arquivos JPG, JPEG, PNG e GIF são permitidos.');</script>";
-        $uploadOk = 0;
-    }
-
-    // Verifica se $uploadOk é 0 devido a um erro
-    if ($uploadOk == 0) {
-        echo "<script>alert('Desculpe, seu arquivo não foi enviado.');</script>";
-    } else {
-        if (move_uploaded_file($_FILES["imgproduto"]["tmp_name"], $targetFile)) {
-            echo "<script>alert('O arquivo " . htmlspecialchars(basename($_FILES["imgproduto"]["name"])) . " foi enviado com sucesso.');</script>";
-            // Atualiza o caminho da imagem no banco de dados
-            $updateStmt = $conn->prepare("UPDATE produto SET foto_produto = :foto WHERE CD_CANDIDATO = :cod");
-            $updateStmt->execute(['foto' => $targetFile, 'cd' => $cd]);
-
-            // Atualiza a página para mostrar a nova imagem
-            echo "<script>window.location.href = '" . $_SERVER['PHP_SELF'] . "';</script>";
-            exit;
-        } else {
-            echo "<script>alert('Desculpe, houve um erro ao enviar seu arquivo.');</script>";
-        }
+        echo "<script>alert('Erro: ".addslashes($result['message'])."');</script>";
     }
 }
+$empresa = $produtoHandler->getEmpresa($cod);
+$arquivos = $produtoHandler->getArquivos($cod);
 
-$stmt = $conn->prepare("SELECT * FROM candidato WHERE CD_CANDIDATO = :cd");
-$stmt->execute(['cd' => $cd]);
-$candidato = $stmt->fetch(PDO::FETCH_ASSOC);
-
-$stmtArquivos = $conn->prepare("SELECT * FROM arquivos WHERE CD_CANDIDATO = :cd");
-$stmtArquivos->execute(['cd' => $cd]);
-$arquivos = $stmtArquivos->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <!DOCTYPE html>
@@ -139,7 +90,7 @@ $arquivos = $stmtArquivos->fetchAll(PDO::FETCH_ASSOC);
 
 
                         <label class="form-label">Descrição do Produto</label>
-                        <input type="password" class="form-control" name="senha_u">
+                        <input type="password" class="form-control" name="ds_produto">
 
                         <ul class="nav flex-column">
                             <li class="nav-item">

@@ -3,18 +3,27 @@ include_once('C:/xampp/htdocs/dashboard/siteirmandade/conexao/conexaoIrm.php');
 include_once('classes/Usuario.php');
 include_once('classes/Produto.php');
 include_once('classes/Sessao.php');
+include_once('classes/Empresa.php');
+
+
 
 // Verificação de login
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
   $usuario = new Usuario();
   $sessao = new Sessao();
+  $empresa = new Empresa();
 
   $dadosUsuario = $usuario->login($_POST['email'], $_POST['senha']);
+  $dadosEmpresa = $empresa->login($_POST['email'], $_POST['senha']);
 
   if ($dadosUsuario) {
     $sessao->criarSessaoUsuario($dadosUsuario['cd_u'], $dadosUsuario['email_u']);
     header('produtos.php');
-  } else {
+  } else if($dadosEmpresa){
+    $sessao->criarSessaoEmpresa($dadosEmpresa['cd_em'],$dadosEmpresa['email_em']);
+    header('CadastroProduto.php');
+  } 
+   else {
     $erroLogin = "Email ou senha incorretos!";
   }
 }
@@ -146,7 +155,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
 
 
   <!-- carousel -->
-  <div class="container-fluid" id="carousel">
+  <!-- <div class="container-fluid" id="carousel">
   </div>
   <div id="carouselExampleDark" class="carousel carousel-dark slide" data-bs-ride="carousel">
     <div class="carousel-indicators">
@@ -181,7 +190,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
       <span class="carousel-control-next-icon" aria-hidden="true"></span>
       <span class="visually-hidden">Next</span>
     </button>
-  </div>
+  </div> -->
 
   <!-- carousel fim -->
   <br>
